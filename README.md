@@ -1,9 +1,9 @@
-# G simulation
+# Timed Automata with diagonal constraints and updates
 
 [![Build and test TChecker](https://github.com/ticktac-project/tchecker/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/ticktac-project/tchecker/actions/workflows/build-and-test.yml)
 [![License](https://img.shields.io/badge/license-MIT-informational.svg)](https://github.com/ticktac-project/tchecker/blob/master/LICENSE)
 
-This is a prototype implementation of the simulation relation described in the following two papers:
+This extends the zone based algorithms of classical Timed Automata to Timed Automata with diagonal constraints and updates. This implements the simulation relation described in the following two papers on top of the tool [TChecker](https://github.com/ticktac-project/tchecker):
 
  - *Fast Algorithms for Handling Diagonal Constraints in Timed Automata* <br>
 Paul Gastin, Sayan Mukherjee, B Srivathsan <br>
@@ -11,8 +11,6 @@ in the proceedings of CAV 2019, LNCS 11561 [link to paper](https://link.springer
  - *Reachability for Updatable Timed Automata Made Faster and More Effective* <br>
  Paul Gastin, Sayan Mukherjee, B Srivathsan <br>
  in the proceedings of FSTTCSS 2020, LIPIcs 182 [link to paper](https://drops.dagstuhl.de/opus/volltexte/2020/13288/)
-
-This simulation relation has been implemented on top of the tool [TChecker](https://github.com/ticktac-project/tchecker). The objective of this simulation relation is to allow checking reachability in the presence of diagonal constraints and/or some updates in the input automaton.
 
 This implementation adds the algorithm option `gsim`, which can be selected while running TChecker using the flag `-a`.
 
