@@ -18,6 +18,8 @@
 #include "tchecker/utils/log.hh"
 #include "zg-covreach.hh"
 #include "zg-reach.hh"
+#include "zg-gsim.hh"
+#include "zg-lu.hh"
 
 /*!
  \file tck-reach.cc
@@ -46,6 +48,8 @@ void usage(char * progname)
   std::cerr << "          reach:     standard reachability algorithm over the zone graph" << std::endl;
   std::cerr << "          concur19:  reachability algorithm with covering over the local-time zone graph" << std::endl;
   std::cerr << "          covreach:  reachability algorithm with covering over the zone graph" << std::endl;
+  std::cerr << "          alu:       reachability algorithm with LU-simulation over the zone graph" << std::endl;
+  std::cerr << "          gsim:      reachability algorithm with g-simulation over the zone graph" << std::endl;
   std::cerr << "   -C out_file   output a certificate (as a graph) in out_file" << std::endl;
   std::cerr << "   -h            help" << std::endl;
   std::cerr << "   -l l1,l2,...  comma-separated list of searched labels" << std::endl;
@@ -59,6 +63,8 @@ enum algorithm_t {
   ALGO_REACH,    /*!< Reachability algorithm */
   ALGO_CONCUR19, /*!< Covering reachability algorithm over the local-time zone graph */
   ALGO_COVREACH, /*!< Covering reachability algorithm */
+  ALGO_LU,       /*!< Covering reachability algorithm with LU-simulation */
+  ALGO_GSIM,     /*!< Covering reachability algorithm with G-simulation */
   ALGO_NONE,     /*!< No algorithm */
 };
 
@@ -100,6 +106,10 @@ int parse_command_line(int argc, char * argv[])
           algorithm = ALGO_CONCUR19;
         else if (strcmp(optarg, "covreach") == 0)
           algorithm = ALGO_COVREACH;
+        else if (strcmp(optarg, "alu") == 0)
+          algorithm = ALGO_LU;
+        else if (strcmp(optarg, "gsim") == 0)
+          algorithm = ALGO_GSIM;
         else
           throw std::runtime_error("Unknown algorithm: " + std::string(optarg));
         break;
@@ -233,6 +243,56 @@ void covreach(std::shared_ptr<tchecker::parsing::system_declaration_t> const & s
 }
 
 /*!
+ \brief Perform covering reachability analysis with LU-simulation
+ \param sysdecl : system declaration
+ \post statistics on covering reachability analysis of command-line specified
+ labels in the system declared by sysdecl have been output to standard output.
+ A certification has been output if required.
+*/
+void alu(std::shared_ptr<tchecker::parsing::system_declaration_t> const & sysdecl)
+{
+  auto && [stats, graph] = tchecker::tck_reach::zg_lu::run(sysdecl, labels, search_order, block_size, table_size);
+
+  // stats
+  std::map<std::string, std::string> m;
+  stats.attributes(m);
+  for (auto && [key, value] : m)
+    std::cout << key << " " << value << std::endl;
+
+  // graph
+  if (output_file != "") {
+    std::ofstream ofs{output_file};
+    tchecker::tck_reach::zg_lu::dot_output(ofs, *graph, sysdecl->name());
+    ofs.close();
+  }
+}
+
+/*!
+ \brief Perform covering reachability analysis with G-simulation
+ \param sysdecl : system declaration
+ \post statistics on covering reachability analysis of command-line specified
+ labels in the system declared by sysdecl have been output to standard output.
+ A certification has been output if required.
+*/
+void gsim(std::shared_ptr<tchecker::parsing::system_declaration_t> const & sysdecl)
+{
+  auto && [stats, graph] = tchecker::tck_reach::zg_gsim::run(sysdecl, labels, search_order, block_size, table_size);
+
+  // stats
+  std::map<std::string, std::string> m;
+  stats.attributes(m);
+  for (auto && [key, value] : m)
+    std::cout << key << " " << value << std::endl;
+
+  // graph
+  if (output_file != "") {
+    std::ofstream ofs{output_file};
+    tchecker::tck_reach::zg_gsim::dot_output(ofs, *graph, sysdecl->name());
+    ofs.close();
+  }
+}
+
+/*!
  \brief Main function
 */
 int main(int argc, char * argv[])
@@ -267,6 +327,12 @@ int main(int argc, char * argv[])
       break;
     case ALGO_COVREACH:
       covreach(sysdecl);
+      break;
+    case ALGO_LU:
+      alu(sysdecl);
+      break;
+    case ALGO_GSIM:
+      gsim(sysdecl);
       break;
     default:
       throw std::runtime_error("No algorithm specified");

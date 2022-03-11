@@ -8,6 +8,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
+#include "test-amap.hh"
 #include "test-cache.hh"
 #include "test-db.hh"
 #include "test-dbm.hh"

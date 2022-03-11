@@ -14,6 +14,7 @@
 #include "tchecker/basictypes.hh"
 #include "tchecker/dbm/db.hh"
 #include "tchecker/variables/clocks.hh"
+#include "tchecker/expression/typed_expression.hh"
 
 /*!
  \file dbm.hh
@@ -385,6 +386,29 @@ void reset_to_sum(tchecker::dbm::db_t * dbm, tchecker::clock_id_t dim, tchecker:
                   tchecker::integer_t value);
 
 /*!
+ \brief Reset a clock to the sum of a clock and a negative integer
+ \param dbm : a dbm
+ \param dim : dimension of dbm
+ \param x : left-value clock
+ \param y : right-value clock
+ \param value : a value
+ \pre dbm is not nullptr (checked by assertion)
+ dbm is a dim*dim array of difference bounds
+ dbm is consistent (checked by assertion)
+ dbm is tight (checked by assertion)
+ dim >= 1 (checked by assertion).
+ 0 <= x < dim (checked by assertion)
+ 0 <= y < dim (checked by assertion)
+ value < 0 (checked by assertion)
+ `<= value` can be represented by tchecker::dbm::db_t (checked by assertion)
+ \post dbm has been updated according to reset `x := y + value`
+ dbm is consistent (checked by assertion)
+ dbm is tight (checked by assertion)
+ */
+void reset_to_subtraction(tchecker::dbm::db_t * dbm, tchecker::clock_id_t dim, tchecker::clock_id_t x, tchecker::clock_id_t y,
+                  tchecker::integer_t value);
+
+/*!
  \brief Open up (delay)
  \param dbm : a dbm
  \param dim : dimension of dbm
@@ -544,6 +568,42 @@ bool is_alu_le(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm
  */
 bool is_am_le(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2, tchecker::clock_id_t dim,
               tchecker::integer_t const * m);
+
+/*!
+ \brief Checks simulation w.r.t. G-simulation (diagonal-free)
+ \param dbm1 : a first dbm
+ \param dbm2 : a second dbm
+ \param dim : dimension of dbm1 and dbm2
+ \param Gdf : a set of non-diagonal constraints
+ \pre dbm1 and dbm2 are not nullptr (checked by assertion)
+ dbm1 and dbm2 are dim*dim arrays of difference bounds
+ dbm1 and dbm2 are consistent (checked by assertion)
+ dbm1 and dbm2 are positive (checked by assertion)
+ dbm1 and dbm2 are tight (checked by assertion)
+ dim >= 1 (checked by assertion)
+ \return true if dbm1 <=_Gdf dbm2, false otherwise
+ */
+bool is_g_le_nd(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2, tchecker::clock_id_t dim,
+            std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf);
+
+/*!
+ \brief Checks simulation w.r.t. G-simulation
+ \param dbm1 : a first dbm
+ \param dbm2 : a second dbm
+ \param dim : dimension of dbm1 and dbm2
+ \param G   : a set of diagonal constraints
+ \param Gdf : a set of non-diagonal constraints
+ \pre dbm1 and dbm2 are not nullptr (checked by assertion)
+ dbm1 and dbm2 are dim*dim arrays of difference bounds
+ dbm1 and dbm2 are consistent (checked by assertion)
+ dbm1 and dbm2 are positive (checked by assertion)
+ dbm1 and dbm2 are tight (checked by assertion)
+ dim >= 1 (checked by assertion)
+ \return true if dbm1 <=_(G U Gdf) dbm2, false otherwise (see "Fast Algorithms for Handling Diagonal Constraints in Timed Automata", Paul Gastin, Sayan Mukherjee, B Srivathsan, in proceedings of CAV 2019)
+ */
+bool is_g_le(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2, tchecker::clock_id_t dim,
+            std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G,
+            std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf);
 
 /*!
  \brief Hash function

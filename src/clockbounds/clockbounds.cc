@@ -576,4 +576,145 @@ std::shared_ptr<tchecker::clockbounds::local_m_map_t> clockbounds_t::local_m_map
 
 } // namespace clockbounds
 
+namespace amap {
+
+/* a_map_t */
+
+a_map_t::a_map_t(tchecker::loc_id_t loc_nb)
+    : _loc_nb(0), _G(), _Gdf()
+{
+  resize(loc_nb);
+}
+
+a_map_t::a_map_t(tchecker::amap::a_map_t const & m)
+    : _loc_nb(m._loc_nb), _G(m._G), _Gdf(m._Gdf)
+{
+}
+
+a_map_t::a_map_t(tchecker::amap::a_map_t && m)
+    : _loc_nb(m._loc_nb), _G(std::move(m._G)), _Gdf(std::move(m._Gdf))
+{
+  m._loc_nb = 0;
+}
+
+a_map_t::~a_map_t() { clear(); }
+
+tchecker::amap::a_map_t & a_map_t::operator=(tchecker::amap::a_map_t const & m)
+{
+  if (this != &m) {
+    clear();
+
+    _loc_nb = m._loc_nb;
+    _G = m._G;
+    _Gdf = m._Gdf;
+  }
+  return *this;
+}
+
+tchecker::amap::a_map_t & a_map_t::operator=(tchecker::amap::a_map_t && m)
+{
+  if (this != &m) {
+    clear();
+
+    _loc_nb = std::move(m._loc_nb);
+    _G = std::move(m._G);
+    _Gdf = std::move(m._Gdf);
+
+    m._loc_nb = 0;
+    m._G.clear();
+    m._Gdf.clear();
+  }
+  return *this;
+}
+
+void a_map_t::clear()
+{
+  _loc_nb = 0;
+  _G.clear();
+  _Gdf.clear();
+}
+
+void a_map_t::resize(tchecker::loc_id_t loc_nb)
+{
+  clear();
+
+  _loc_nb = loc_nb;
+  _G.resize(loc_nb);
+  _Gdf.resize(loc_nb);
+}
+
+tchecker::loc_id_t a_map_t::loc_number() const { return _loc_nb; }
+
+std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & a_map_t::G(tchecker::loc_id_t id)
+{
+  assert(id < _loc_nb);
+  return _G[id];
+}
+
+std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> const & a_map_t::G(tchecker::loc_id_t id) const
+{
+  assert(id < _loc_nb);
+  return _G[id];
+}
+
+std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & a_map_t::Gdf(tchecker::loc_id_t id)
+{
+  assert(id < _loc_nb);
+  return _Gdf[id];
+}
+
+std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & a_map_t::Gdf(tchecker::loc_id_t id) const
+{
+  assert(id < _loc_nb);
+  return _Gdf[id];
+}
+
+void a_map_t::bounds(tchecker::loc_id_t id, std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G, std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & Gdf) const
+{
+  assert(id < _loc_nb);
+  assert(_G.size() == _loc_nb);
+  assert(_Gdf.size() == _loc_nb);
+  G.clear();
+  Gdf.clear();
+  for (const auto & diag : _G[id]) G.push_back(diag);
+  for (const auto & nondiag : _Gdf[id]) Gdf.push_back(nondiag);
+}
+
+void a_map_t::bounds(tchecker::vloc_t const & vloc, std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G, std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & Gdf) const
+{
+  assert(_G.size() == _loc_nb);
+  assert(_Gdf.size() == _loc_nb);
+  G.clear();
+  Gdf.clear();
+  for (tchecker::clock_id_t id : vloc) {
+    assert(id < _loc_nb);
+    for (const auto & diag : _G[id])
+      G.push_back(diag);
+    
+    for (const auto & nondiag : _Gdf[id])
+      Gdf.push_back(nondiag);
+  }
+}
+
+std::ostream & operator<<(std::ostream & os, tchecker::amap::a_map_t const & map)
+{
+  tchecker::loc_id_t loc_nb = map.loc_number();
+  
+  for (tchecker::loc_id_t l = 0; l < loc_nb; ++l) {
+    os << l << ": G=["; 
+    for (const auto & diag : map.G(l))
+      os << *diag << ",";
+
+    os << "] Gdf=["; 
+    for (const auto & nondiag : map.Gdf(l)) 
+      os << *nondiag << ",";
+      
+    os << "]" << std::endl;
+  }
+
+  return os;
+}
+
+}
+
 } // namespace tchecker

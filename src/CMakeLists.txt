@@ -106,6 +106,10 @@ add_executable(tck-reach
                ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/tck-reach.cc
                ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-covreach.cc
                ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-covreach.hh
+               ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-gsim.cc
+               ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-gsim.hh
+               ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-lu.cc
+               ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-lu.hh
                ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-reach.cc
                ${CMAKE_CURRENT_SOURCE_DIR}/tck-reach/zg-reach.hh)
 target_link_libraries(tck-reach libtchecker_static)

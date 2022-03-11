@@ -101,6 +101,17 @@ public:
               tchecker::clockbounds::map_t const & u) const;
 
   /*!
+   \brief Checks inclusion wrt G simulation
+   \param zone : a DBM zone
+   \param G : a vector of diagonal constraints
+   \param Gdf : a vector of non-diagonal constraints
+   \return true if this zone is (G U Gdf)-simulated by zone, false otherwise
+   */
+  bool g_le(tchecker::zg::zone_t const & zone, 
+                  std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G,
+                  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf) const;
+
+  /*!
    \brief Lexical ordering
    \param zone : a DBM zone
    \return 0 if this and zone are equal, a negative value if this is smaller than zone w.r.t. lexical ordering on the clock

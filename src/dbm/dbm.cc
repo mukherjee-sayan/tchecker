@@ -15,6 +15,7 @@
 
 #include "tchecker/dbm/dbm.hh"
 #include "tchecker/utils/ordering.hh"
+#include "tchecker/expression/static_analysis.hh"
 
 namespace tchecker {
 
@@ -279,8 +280,10 @@ void reset(tchecker::dbm::db_t * dbm, tchecker::clock_id_t dim, tchecker::clock_
     reset_to_value(dbm, dim, x, value);
   else if (value == 0)
     reset_to_clock(dbm, dim, x, y);
-  else
+  else if (value > 0)
     reset_to_sum(dbm, dim, x, y, value);
+  else
+    reset_to_subtraction(dbm, dim, x, y, value);
 }
 
 void reset(tchecker::dbm::db_t * dbm, tchecker::clock_id_t dim, tchecker::clock_reset_container_t const & resets)
@@ -365,6 +368,44 @@ void reset_to_sum(tchecker::dbm::db_t * dbm, tchecker::clock_id_t dim, tchecker:
     DBM(z, x) = tchecker::dbm::add(DBM(z, y), -value);
   }
   DBM(x, x) = tchecker::dbm::LE_ZERO; // cheaper than testing in loop
+
+  assert(tchecker::dbm::is_consistent(dbm, dim));
+  assert(tchecker::dbm::is_tight(dbm, dim));
+}
+
+void reset_to_subtraction(tchecker::dbm::db_t * dbm, tchecker::clock_id_t dim, tchecker::clock_id_t x, tchecker::clock_id_t y,
+                  tchecker::integer_t value)
+{
+  assert(dbm != nullptr);
+  assert(dim >= 1);
+  assert(tchecker::dbm::is_consistent(dbm, dim));
+  assert(tchecker::dbm::is_tight(dbm, dim));
+  assert(x < dim);
+  assert(y < dim);
+  assert(value < 0);
+
+  // NB: this is a reset not a constraint. Hence, resetting x:=y+value
+  // only impacts difference bounds involving x (i.e. x-z and z-x
+  // for all z including y and 0). Other difference bounds u-v for
+  // any u,v distinct from x are not touched since the values of u
+  // and v are not modified when x is reset to y+value
+
+  // If x == y:
+  // x' - x <= v & x - z <= d & z = z' --> x' - z' <= d+v
+  // x - x' <= -v & z - x <= d & z = z' --> z' - x' <= d-v
+
+  // If x != y:
+  // x - y <= v & y - z <= d --> x - z <= d+v
+  // y - x <= -v & z - y <= d --> z - x <= d-v
+  for (tchecker::clock_id_t z = 0; z < dim; ++z) {
+    DBM(x, z) = tchecker::dbm::add(DBM(y, z), value);
+    DBM(z, x) = tchecker::dbm::add(DBM(z, y), -value);
+  }
+  DBM(x, x) = tchecker::dbm::LE_ZERO; // cheaper than testing in loop
+
+  tchecker::dbm::db_t dbm_univ_pos[dim*dim];
+  tchecker::dbm::universal_positive(dbm_univ_pos, dim);
+  tchecker::dbm::intersection(dbm, dbm, dbm_univ_pos, dim);
 
   assert(tchecker::dbm::is_consistent(dbm, dim));
   assert(tchecker::dbm::is_tight(dbm, dim));
@@ -749,6 +790,199 @@ bool is_am_le(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2
               tchecker::integer_t const * m)
 {
   return tchecker::dbm::is_alu_le(dbm1, dbm2, dim, m, m);
+}
+
+bool is_g_le_nd(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2, tchecker::clock_id_t dim,
+                std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf)
+{
+  assert(dbm1 != nullptr);
+  assert(dbm2 != nullptr);
+  assert(dim >= 1);
+  assert(tchecker::dbm::is_consistent(dbm1, dim));
+  assert(tchecker::dbm::is_consistent(dbm2, dim));
+  assert(tchecker::dbm::is_positive(dbm1, dim));
+  assert(tchecker::dbm::is_positive(dbm2, dim));
+  assert(tchecker::dbm::is_tight(dbm1, dim));
+  assert(tchecker::dbm::is_tight(dbm2, dim));
+
+  // From Gdf construct Gdf_u and Gdf_l
+  // Gdf_u (resp. Gdf_l) consists of upper (resp. lower) bound constraints
+  // Gdf = Gdf_u U Gdf_l
+  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> Gdf_u{}, Gdf_l{};
+  for (tchecker::typed_simple_clkconstr_expression_t const * nondiag : Gdf)
+  {
+    if (nondiag->binary_operator() == EXPR_OP_LE ||
+        nondiag->binary_operator() == EXPR_OP_LT)
+      Gdf_u.push_back(nondiag);
+    else if (nondiag->binary_operator() == EXPR_OP_GE ||
+             nondiag->binary_operator() == EXPR_OP_GT)
+      Gdf_l.push_back(nondiag);
+    else
+      throw std::invalid_argument("unexpected expression");
+  }
+
+  // condition 1
+  for (tchecker::typed_simple_clkconstr_expression_t const * phi_u : Gdf_u)
+  {
+    tchecker::clock_id_t x = tchecker::extract_lvalue_variable_ids(phi_u->clock()).begin();
+    x = x+1;
+    tchecker::integer_t phi_bound = tchecker::const_evaluate(phi_u->bound());
+    assert(phi_bound >= 0);
+    tchecker::dbm::comparator_t cmp = phi_u->binary_operator() == EXPR_OP_LT ? 
+                                      tchecker::dbm::LT : tchecker::dbm::LE;
+
+    if ( (tchecker::dbm::sum(DBM1(0,x), tchecker::dbm::db(cmp, phi_bound)) >=
+          tchecker::dbm::LE_ZERO) &&
+         (DBM2(0,x) < DBM1(0,x)) ) return false;
+  }
+
+  // condition 2
+  for (tchecker::typed_simple_clkconstr_expression_t const * phi_l : Gdf_l)
+  {
+    tchecker::clock_id_t y = tchecker::extract_lvalue_variable_ids(phi_l->clock()).begin();
+    y = y + 1;
+    tchecker::integer_t phi_bound = tchecker::const_evaluate(phi_l->bound());
+    assert(phi_bound >= 0);
+    tchecker::dbm::comparator_t cmp = phi_l->binary_operator() == EXPR_OP_GT ? 
+                                      tchecker::dbm::LT : tchecker::dbm::LE;
+
+    if ( (tchecker::dbm::sum(DBM2(y,0), tchecker::dbm::db(cmp, -phi_bound)) < tchecker::dbm::LE_ZERO) &&
+         (DBM2(y,0) < DBM1(y,0)) ) return false;
+  }
+
+  // condition 3
+  if (Gdf_u.size() == 0 || Gdf_l.size() == 0) 
+    return true;
+
+  for (tchecker::typed_simple_clkconstr_expression_t const * phi_u : Gdf_u)
+  {
+    tchecker::clock_id_t x = tchecker::extract_lvalue_variable_ids(phi_u->clock()).begin();
+    x = x + 1;
+    tchecker::dbm::comparator_t cmp1 = phi_u->binary_operator() == EXPR_OP_LT ? tchecker::dbm::LT : tchecker::dbm::LE;
+    tchecker::integer_t phi_u_bound = tchecker::const_evaluate(phi_u->bound());
+    assert(phi_u_bound >= 0);
+
+    for (tchecker::typed_simple_clkconstr_expression_t const * phi_l : Gdf_l)
+    {
+      tchecker::clock_id_t y = tchecker::extract_lvalue_variable_ids(phi_l->clock()).begin();
+      y = y + 1;
+
+      if (x == y) continue;
+
+      tchecker::integer_t phi_l_bound = tchecker::const_evaluate(phi_l->bound());
+      assert(phi_l_bound >= 0);
+      
+      tchecker::dbm::comparator_t cmp2 = phi_l->binary_operator() == EXPR_OP_GT ? tchecker::dbm::LT : tchecker::dbm::LE;
+
+      if ( (tchecker::dbm::sum(DBM1(0,x), tchecker::dbm::db(cmp1, phi_u_bound)) >= tchecker::dbm::LE_ZERO) &&
+          (tchecker::dbm::sum(DBM2(y,x), tchecker::dbm::db(cmp2, -phi_l_bound)) < DBM1(0,x)) &&
+          (DBM2(y,x) < DBM1(y,x)) ) return false;
+    }
+  }
+
+  // finally
+  return true;
+}
+bool is_g_le_star(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2, tchecker::clock_id_t dim, 
+                  std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G,
+                  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf)
+{
+  assert(dbm1 != nullptr);
+  assert(dbm2 != nullptr);
+  assert(dim >= 1);
+  assert(tchecker::dbm::is_consistent(dbm1, dim));
+  assert(tchecker::dbm::is_consistent(dbm2, dim));
+  assert(tchecker::dbm::is_positive(dbm1, dim));
+  assert(tchecker::dbm::is_positive(dbm2, dim));
+  assert(tchecker::dbm::is_tight(dbm1, dim));
+  assert(tchecker::dbm::is_tight(dbm2, dim));
+
+  if (G.empty()) return true;
+
+  tchecker::typed_diagonal_clkconstr_expression_t const * phi = G.back();
+  assert(phi != nullptr);
+  G.pop_back(); // phi will be pushed back before exiting this function
+
+  // creating negation of phi
+  tchecker::integer_t bound = tchecker::const_evaluate(phi->bound());
+  tchecker::binary_operator_t phi_op = phi->binary_operator();
+  assert(phi_op != EXPR_OP_EQ && phi_op != EXPR_OP_NEQ);
+
+  // if phi contains > or >= then it needs to be rewritten to contain < or <=
+  bool to_be_rewritten = (phi_op == EXPR_OP_GT || phi_op == EXPR_OP_GE) ? 
+                          true : false; 
+
+  tchecker::clock_id_t clk1, clk2;
+  if (!to_be_rewritten)
+  {
+    clk1 = tchecker::extract_lvalue_variable_ids(phi->first_clock()).begin();
+    clk2 = tchecker::extract_lvalue_variable_ids(phi->second_clock()).begin();
+  }
+  else
+  {
+    // flip the clocks and negate the bound
+    clk1 = tchecker::extract_lvalue_variable_ids(phi->second_clock()).begin();
+    clk2 = tchecker::extract_lvalue_variable_ids(phi->first_clock()).begin();
+    bound = -bound;
+  }
+  tchecker::dbm::comparator_t cmp = (phi_op == EXPR_OP_GE || phi_op == EXPR_OP_LE) ? tchecker::dbm::LT : tchecker::dbm::LE;
+  tchecker::dbm::comparator_t cmp_phi = (phi_op == EXPR_OP_GE || phi_op == EXPR_OP_LE) ? tchecker::dbm::LE : tchecker::dbm::LT;
+
+  tchecker::dbm::db_t dbm1_intersection_neg_phi[dim*dim];
+  tchecker::dbm::universal(dbm1_intersection_neg_phi, dim);
+  tchecker::dbm::intersection(dbm1_intersection_neg_phi, 
+                              dbm1_intersection_neg_phi, dbm1, dim);
+
+  if (tchecker::dbm::constrain(dbm1_intersection_neg_phi, dim, clk1, clk2, cmp, bound) == tchecker::dbm::NON_EMPTY)
+  {
+    if (!is_g_le_star(dbm1_intersection_neg_phi, dbm2, dim, G, Gdf))
+    {
+      G.push_back(phi);
+      return false;
+    }
+  }
+
+  // create dbm1 intersection phi and dbm2 intersection phi
+
+  // create copies of dbm1, dbm2
+  tchecker::dbm::db_t dbm1_intersection_phi[dim*dim],
+                      dbm2_intersection_phi[dim*dim];
+  tchecker::dbm::universal(dbm1_intersection_phi, dim);
+  tchecker::dbm::universal(dbm2_intersection_phi, dim);
+  tchecker::dbm::intersection(dbm1_intersection_phi, 
+                              dbm1_intersection_phi, dbm1, dim);
+  tchecker::dbm::intersection(dbm2_intersection_phi, 
+                              dbm2_intersection_phi, dbm2, dim);
+
+  // intersect with phi
+  tchecker::dbm::constrain(dbm1_intersection_phi, dim, clk1, clk2, cmp_phi, bound);
+  tchecker::dbm::constrain(dbm2_intersection_phi, dim, clk1, clk2, cmp_phi, bound);
+  
+  bool ans = is_g_le(dbm1_intersection_phi, dbm2_intersection_phi, dim, G, Gdf);
+  G.push_back(phi);
+  return ans;
+}
+
+bool is_g_le(tchecker::dbm::db_t const * dbm1, tchecker::dbm::db_t const * dbm2, tchecker::clock_id_t dim,
+            std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G,
+            std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf)
+{
+  assert(dbm1 != nullptr);
+  assert(dbm2 != nullptr);
+  assert(dim >= 1);
+
+  if (tchecker::dbm::is_empty_0(dbm1, dim)) return true;
+  if (tchecker::dbm::is_empty_0(dbm2, dim)) return false;
+
+  assert(tchecker::dbm::is_consistent(dbm1, dim));
+  assert(tchecker::dbm::is_consistent(dbm2, dim));
+  assert(tchecker::dbm::is_positive(dbm1, dim));
+  assert(tchecker::dbm::is_positive(dbm2, dim));
+  assert(tchecker::dbm::is_tight(dbm1, dim));
+  assert(tchecker::dbm::is_tight(dbm2, dim));
+
+  if (!tchecker::dbm::is_g_le_nd(dbm1, dbm2, dim, Gdf)) return false;
+  return is_g_le_star(dbm1, dbm2, dim, G, Gdf);
 }
 
 std::size_t hash(tchecker::dbm::db_t const * dbm, tchecker::clock_id_t dim)

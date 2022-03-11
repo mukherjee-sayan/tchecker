@@ -72,6 +72,17 @@ bool zone_t::alu_le(tchecker::zg::zone_t const & zone, tchecker::clockbounds::ma
   return tchecker::dbm::is_alu_le(dbm_ptr(), zone.dbm_ptr(), _dim, l.ptr(), u.ptr());
 }
 
+bool zone_t::g_le(tchecker::zg::zone_t const & zone, 
+                  std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G,
+                  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf) const
+{
+  if (this->is_empty())
+    return true;
+  if (zone.is_empty())
+    return false;
+  return tchecker::dbm::is_g_le(dbm_ptr(), zone.dbm_ptr(), _dim, G, Gdf);
+}
+
 int zone_t::lexical_cmp(tchecker::zg::zone_t const & zone) const
 {
   return tchecker::dbm::lexical_cmp(dbm_ptr(), _dim, zone.dbm_ptr(), zone._dim);

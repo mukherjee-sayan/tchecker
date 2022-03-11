@@ -113,8 +113,8 @@ clock_reset_t::clock_reset_t(tchecker::clock_id_t left_id, tchecker::clock_id_t 
   if (_left_id == tchecker::REFCLOCK_ID)
     throw std::invalid_argument("reference clock is not a left-value clock");
 
-  if (_value < 0)
-    throw std::invalid_argument("reset value should be >= 0");
+  // if (_value < 0)
+  //   throw std::invalid_argument("reset value should be >= 0");
 }
 
 bool operator==(tchecker::clock_reset_t const & r1, tchecker::clock_reset_t const & r2)

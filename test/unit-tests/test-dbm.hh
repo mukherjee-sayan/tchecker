@@ -1736,3 +1736,123 @@ TEST_CASE("Zone inclusion w.r.t. abstraction aLU from LICS12", "[dbm]")
     REQUIRE(tchecker::dbm::is_alu_le(dbm_positive, dbm, dim, l_inf, u_inf));
   }
 }
+
+TEST_CASE("LU simulation implies G simulation", "[dbm]")
+{
+  tchecker::clock_variables_t clocks;
+  // clocks.declare("zero",1);
+  clocks.declare("x", 1);
+  clocks.declare("y", 1);
+
+  tchecker::clock_id_t const dim = 3;
+  tchecker::clock_id_t const x = clocks.id("x") + 1;
+  tchecker::clock_id_t const y = clocks.id("y") + 1;
+  REQUIRE(x == 1);
+  REQUIRE(y == 2);
+
+  tchecker::integer_variables_t intvars;
+
+  // 0 <= x - y <= 3 (Fig.1 in "Better abstraction for timed automata", Herbreteau, Srivathsan and Walukiewicz, LICS, 2012
+  tchecker::dbm::db_t dbm[dim * dim];
+  tchecker::dbm::universal_positive(dbm, dim);
+  DBM(x, y) = tchecker::dbm::db(tchecker::dbm::LE, 3);
+  DBM(y, x) = tchecker::dbm::db(tchecker::dbm::LE, 0);
+  tchecker::dbm::tighten(dbm, dim);
+
+  tchecker::integer_t l[dim - 1] = {1, 2}, u[dim - 1] = {4, 4};
+  std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> * G = new std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> ();
+  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> *Gdf = new std::vector<tchecker::typed_simple_clkconstr_expression_t const *> ();
+
+  std::string p1("x>=1 && y>2 && x<4 && y<=4");
+  tchecker::expression_t * p1_expr = tchecker::parsing::parse_expression("", p1);
+  REQUIRE(p1_expr != nullptr);
+
+  tchecker::integer_variables_t lvars;
+  tchecker::typed_expression_t * typed_p1 = tchecker::typecheck(*p1_expr, lvars, intvars, clocks);
+  REQUIRE(typed_p1 != nullptr);
+
+  tchecker::amap::add_constraint(*typed_p1, *G, *Gdf);
+  REQUIRE(G->size() == 0);
+  REQUIRE(Gdf->size() == 4);
+
+  SECTION("aLU(dbm) contains dbm") { 
+    REQUIRE(tchecker::dbm::is_alu_le(dbm, dbm, dim, l, u)); 
+    REQUIRE(tchecker::dbm::is_g_le(dbm, dbm, dim, *G, *Gdf)); 
+  }
+
+  SECTION("aLU(0 <= x - y <= 3) contains 3 <= x")
+  {
+    tchecker::dbm::db_t dbm2[dim * dim];
+    tchecker::dbm::universal_positive(dbm2, dim);
+    DBM2(0, x) = tchecker::dbm::db(tchecker::dbm::LE, -3);
+    tchecker::dbm::tighten(dbm2, dim);
+
+    REQUIRE(tchecker::dbm::is_alu_le(dbm2, dbm, dim, l, u));
+    REQUIRE(tchecker::dbm::is_g_le(dbm2, dbm, dim, *G, *Gdf));
+  }
+
+  SECTION("aLU(0 <= x - y <= 3) contains 2 < x & 2 <= y")
+  {
+    tchecker::dbm::db_t dbm2[dim * dim];
+    tchecker::dbm::universal_positive(dbm2, dim);
+    DBM2(0, x) = tchecker::dbm::db(tchecker::dbm::LT, -2);
+    DBM2(0, y) = tchecker::dbm::db(tchecker::dbm::LE, -2);
+    tchecker::dbm::tighten(dbm2, dim);
+
+    REQUIRE(tchecker::dbm::is_alu_le(dbm2, dbm, dim, l, u));
+    REQUIRE(tchecker::dbm::is_g_le(dbm2, dbm, dim, *G, *Gdf));
+  }
+
+  SECTION("aLU(0 <= x - y <= 3) contains x-y > 3")
+  {
+    tchecker::dbm::db_t dbm2[dim * dim];
+    tchecker::dbm::universal_positive(dbm2, dim);
+    DBM2(y, x) = tchecker::dbm::db(tchecker::dbm::LT, -3);
+    tchecker::dbm::tighten(dbm2, dim);
+
+    REQUIRE(tchecker::dbm::is_alu_le(dbm2, dbm, dim, l, u));
+    REQUIRE(tchecker::dbm::is_g_le(dbm2, dbm, dim, *G, *Gdf));
+  }
+
+  SECTION("aLU(0 <= x - y <= 3) does not contain x == 2 & y > 2")
+  {
+    tchecker::dbm::db_t dbm2[dim * dim];
+    tchecker::dbm::universal_positive(dbm2, dim);
+    DBM2(0, x) = tchecker::dbm::db(tchecker::dbm::LE, -2);
+    DBM2(x, 0) = tchecker::dbm::db(tchecker::dbm::LE, 2);
+    DBM2(0, y) = tchecker::dbm::db(tchecker::dbm::LT, -2);
+    tchecker::dbm::tighten(dbm2, dim);
+
+    REQUIRE_FALSE(tchecker::dbm::is_alu_le(dbm2, dbm, dim, l, u));
+    REQUIRE_FALSE(tchecker::dbm::is_g_le_nd(dbm2, dbm, dim, *Gdf));
+    REQUIRE_FALSE(tchecker::dbm::is_g_le(dbm2, dbm, dim, *G, *Gdf));
+  }
+
+  SECTION("aLU(0 <= x - y <= 3) does not contain y >= 2")
+  {
+    tchecker::dbm::db_t dbm2[dim * dim];
+    tchecker::dbm::universal_positive(dbm2, dim);
+    DBM2(0, y) = tchecker::dbm::db(tchecker::dbm::LE, -2);
+    tchecker::dbm::tighten(dbm2, dim);
+
+    REQUIRE_FALSE(tchecker::dbm::is_alu_le(dbm2, dbm, dim, l, u));
+    REQUIRE_FALSE(tchecker::dbm::is_g_le(dbm2, dbm, dim, *G, *Gdf));
+  }
+
+  SECTION("aLU(0 <= x - y <= 3) containment w.r.t. positive zone")
+  {
+    tchecker::dbm::db_t dbm_positive[dim * dim];
+    tchecker::dbm::universal_positive(dbm_positive, dim);
+
+    REQUIRE(tchecker::dbm::is_alu_le(dbm, dbm_positive, dim, l, u));
+    REQUIRE(tchecker::dbm::is_g_le(dbm, dbm_positive, dim, *G, *Gdf));
+    REQUIRE_FALSE(tchecker::dbm::is_alu_le(dbm_positive, dbm, dim, l, u));
+    REQUIRE_FALSE(tchecker::dbm::is_g_le(dbm_positive, dbm, dim, *G, *Gdf));
+
+    tchecker::integer_t l_inf[dim - 1] = {-tchecker::dbm::INF_VALUE, -tchecker::dbm::INF_VALUE};
+    tchecker::integer_t u_inf[dim - 1] = {-tchecker::dbm::INF_VALUE, -tchecker::dbm::INF_VALUE};
+
+    REQUIRE(tchecker::dbm::is_alu_le(dbm_positive, dbm, dim, l_inf, u_inf));
+    // REQUIRE(tchecker::dbm::is_g_le(dbm_positive, dbm, dim, l_inf, u_inf));
+  }
+}

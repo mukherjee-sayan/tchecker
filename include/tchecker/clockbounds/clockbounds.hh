@@ -17,6 +17,7 @@
 #include "tchecker/dbm/db.hh"
 #include "tchecker/syncprod/vloc.hh"
 #include "tchecker/utils/array.hh"
+#include "tchecker/expression/typed_expression.hh"
 
 /*!
  \file clockbounds.hh
@@ -873,6 +874,152 @@ private:
 };
 
 } // namespace clockbounds
+
+namespace amap {
+
+//   /*!
+//  \brief Output operator
+//  \param os : output stream
+//  \param map : clock bound map
+//  \post map has been output to os
+//  \return os after map has been output
+//  */
+// std::ostream & operator<<(std::ostream & os, tchecker::clockbounds::map_t const & map);
+
+/*!
+ \class a_map_t
+ \brief Map from system locations to reduced A-maps
+ */
+class a_map_t {
+public:
+  /*!
+   \brief Constructor
+   \param loc_nb : number of locations
+   \note all location ID in [0..loc_nb) are assumed to be valid
+   */
+  a_map_t(tchecker::loc_id_t loc_nb);
+
+  /*!
+   \brief Copy constructor
+   \param m : map
+   \brief this is a copy of m
+   */
+  a_map_t(tchecker::amap::a_map_t const & m);
+
+  /*!
+   \brief Move constructor
+   \param m : map
+   \post m has been moved to this
+   */
+  a_map_t(tchecker::amap::a_map_t && m);
+
+  /*!
+   \brief Destructor
+   */
+  ~a_map_t();
+
+  /*!
+   \brief Assignment operator
+   \param m : map
+   \post this is a copy of m
+   */
+  tchecker::amap::a_map_t & operator=(tchecker::amap::a_map_t const & m);
+
+  /*!
+   \brief Move-assignment operator
+   \param m : map
+   \post m has been moved to this
+   */
+  tchecker::amap::a_map_t & operator=(tchecker::amap::a_map_t && m);
+
+  /*!
+   \brief Clear the map
+   \post This map is empty: locations number is 0, and all memory has been deallocated
+  */
+  void clear();
+
+  /*!
+   \brief Resize the map
+   \param loc_nb : number of locations
+   \note all location ID in [0..loc_nb) are assumed to be valid
+   \post this map has been cleared and resized to loc_nb locations
+   */
+  void resize(tchecker::loc_id_t loc_nb);
+
+  /*!
+   \brief Accessor
+   \return Number of locations
+   */
+  tchecker::loc_id_t loc_number() const;
+
+  /*!
+   \brief Accessor
+   \param id : location ID
+   \return G for location id
+   \pre 0 <= id < _loc_nb (checked by assertion)
+   */
+  std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G(tchecker::loc_id_t id);
+
+  /*!
+   \brief Accessor
+   \param id : location ID
+   \return G for location id
+   \pre 0 <= id < _loc_nb (checked by assertion)
+   */
+  std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> const & G(tchecker::loc_id_t id) const;
+  
+  /*!
+   \brief Accessor
+   \param id : location ID
+   \return Gdf for location id
+   \pre 0 <= id < _loc_nb (checked by assertion)
+   */
+  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & Gdf(tchecker::loc_id_t id);
+
+  /*!
+   \brief Accessor
+   \param id : location ID
+   \return Gdf for location id
+   \pre 0 <= id < _loc_nb (checked by assertion)
+   */
+  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf(tchecker::loc_id_t id) const;
+
+  /*!
+  \brief Accessor
+  \param id  : location identifier
+  \param G   : set of diagonal constraints
+  \param Gdf : set of non-diagonal constraints
+  \pre 0 <= id < _loc_nb (checked by assertion)
+  \post G and Gdf are the reduced A-maps for location id
+  */
+  void bounds(tchecker::loc_id_t id, std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G, std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & Gdf) const;
+
+  /*!
+  \brief Accessor
+  \param vloc : tuple of location identifiers
+  \param G   : set of diagonal constraints
+  \param Gdf : set of non-diagonal constraints
+  \pre all locations identifiers in vloc are in [0.._loc_nb) (checked by assertion)
+  \post G and Gdf are the unions of G[l] and Gdf[l], respectively, for every location l present in vloc
+  */
+  void bounds(tchecker::vloc_t const & vloc, std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G, std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & Gdf) const;
+
+private:
+  tchecker::loc_id_t _loc_nb;                     /*!< Number of system locations */
+  std::vector<std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *>> _G;   /*!< vector containing diagonal constraints of reduced A-map */
+  std::vector<std::vector<tchecker::typed_simple_clkconstr_expression_t const *>> _Gdf;   /*!< vector containing non-diagonal constraints of reduced A-map */
+};
+
+/*!
+ \brief Output operator
+ \param os : output stream
+ \param map : local LU map
+ \post map has been output to os
+ \return os after map has been output
+ */
+std::ostream & operator<<(std::ostream & os, tchecker::amap::a_map_t const & map);
+
+} // namespace amap
 
 } // namespace tchecker
 

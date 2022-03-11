@@ -52,6 +52,19 @@ std::size_t hash_value(tchecker::zg::state_t const & s)
   return h;
 }
 
+bool alu_le(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & s2,
+                 tchecker::clockbounds::map_t const & l, tchecker::clockbounds::map_t const & u)
+{
+  return tchecker::ta::operator==(s1, s2) && s1.zone().alu_le(s2.zone(), l, u);
+}
+
+bool g_le(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & s2,
+          std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *>  & G, 
+          std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf)
+{
+  return tchecker::ta::operator==(s1, s2) && s1.zone().g_le(s2.zone(), G, Gdf);
+}
+
 int lexical_cmp(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & s2)
 {
   int ta_cmp = tchecker::ta::lexical_cmp(s1, s2);

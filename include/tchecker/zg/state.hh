@@ -144,6 +144,33 @@ bool operator!=(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & 
 bool operator<=(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & s2);
 
 /*!
+ \brief LU-simulation check
+ \param l : clock lower bounds
+ \param u : clock upper bounds
+ \param s1 : state
+ \param s2 : state
+ \return true if s1 and s2 have the same tuple of locations and integer
+ variables valuation, and the zone in s1 is LU-simulated by the zone in s2,
+ false otherwise
+*/
+bool alu_le(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & s2,
+                 tchecker::clockbounds::map_t const & l, tchecker::clockbounds::map_t const & u);
+
+/*!
+ \brief G-simulation check
+ \param G   : a vector of diagonal constraints
+ \param Gdf : a vector of non-diagonal constraints
+ \param s1 : state
+ \param s2 : state
+ \return true if s1 and s2 have the same tuple of locations and integer
+ variables valuation, and the zone in s1 is G-simulated by the zone in s2,
+ false otherwise
+*/
+bool g_le(tchecker::zg::state_t const & s1, tchecker::zg::state_t const & s2,
+          std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *>  & G, 
+          std::vector<tchecker::typed_simple_clkconstr_expression_t const *> const & Gdf);
+
+/*!
  \brief Hash
  \param s : state
  \return Hash value for state s

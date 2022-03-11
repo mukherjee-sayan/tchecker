@@ -306,6 +306,107 @@ tchecker::clockbounds::clockbounds_t * compute_clockbounds(tchecker::ta::system_
 
 } // end of namespace clockbounds
 
+namespace amap {
+
+  /*!
+  \brief Extract the value of the constant present in an expression
+  \param expr  : an expression
+  \return the value of the constant present in expr
+  */
+  tchecker::integer_t extract_constant(tchecker::typed_expression_t const & expr);
+
+  /*!
+  \brief Given an update and a clock, extract the update to the clock
+  \param up  : an update (typed_statement_t)
+  \param clk : the clock whose update needs to be extracted
+  \param z   : the clock z
+  \param d   : the constant d
+  \post z and d filled appropriately. 
+  if the update is clk:=z then d = nullptr, 
+  if the update is clk:=d then z = nullptr, 
+  if the update does not contain an update to the clock clk, 
+  then z = clk and d = nullptr
+  */
+  void extract_updates(tchecker::typed_statement_t const & up,
+                       tchecker::typed_lvalue_expression_t const & clk,
+                       tchecker::typed_expression_t *& z,
+                       tchecker::typed_expression_t *& d);
+
+  /*!
+  \brief Given an atomic constraint phi and an update up, construct up^{-1}(phi)
+  \param phi : a non-diagonal or diagonal constraint
+  \param up  : an update
+  \param pre : the expression up^{-1}(phi)
+  \post pre is filled with the expression up^{-1}(phi)
+  */
+  void compute_upinverse(tchecker::typed_simple_clkconstr_expression_t const * phi,
+                   tchecker::typed_statement_t const & up,
+                   tchecker::typed_expression_t * & pre);
+
+  void compute_upinverse(tchecker::typed_diagonal_clkconstr_expression_t const * phi,
+                   tchecker::typed_statement_t const & up,
+                   tchecker::typed_expression_t * & pre);
+
+  /*!
+  \brief Compute pre(up^{-1}(phi), g) according to Table 1 of the paper :
+  "Reachability for Updatable Timed Automata Made Faster and More Effective"
+  Paul Gastin, Sayan Mukherjee, B. Srivathsan
+  published in the proceedings of FSTTCS 2020, LIPICs
+  \param pre : an atomic constraint (initially, up^{-1}(phi))
+  \param g   : a guard
+  \post pre is filled with the expression pre(up^{-1}(phi), g)
+  */
+  void guard_based_optimization(tchecker::typed_expression_t *& pre,
+                                tchecker::typed_expression_t const & g);
+
+  /*!
+  \brief Compute pre(phi, g, up) according to Definition 7 of the paper :
+  "Reachability for Updatable Timed Automata Made Faster and More Effective"
+  Paul Gastin, Sayan Mukherjee, B. Srivathsan
+  published in the proceedings of FSTTCS 2020, LIPICs
+  \param EXPR: either EXPR_TYPE_CLKCONSTR_SIMPLE or EXPR_TYPE_CLKCONSTR_DIAGONAL
+  \param phi : an atomic constraint of type EXPR
+  \param up  : an update
+  \param pre : the expression pre(phi, g, up)
+  \post pre is filled with the expression pre(phi, g, up)
+  */
+  template<typename EXPR>
+  void compute_pre(EXPR const * phi,
+                   tchecker::typed_expression_t const & g,
+                   tchecker::typed_statement_t const & up,
+                   tchecker::typed_expression_t * & pre);
+
+  /*!
+  \brief Add atomic constraints from a constraint to appropriate G, Gdf
+  \param g   : a constraint
+  \param loc : location identifier
+  \param G   : set of diagonal constraints
+  \param Gdf : set of non-diagonal constraints
+  \post All atomic constraints from the constraint g is added to G[loc] and Gdf[loc]
+  */
+  void add_constraint(tchecker::typed_expression_t const & g, std::vector<tchecker::typed_diagonal_clkconstr_expression_t const *> & G, 
+  std::vector<tchecker::typed_simple_clkconstr_expression_t const *> & Gdf);
+
+  /*!
+  \brief Computes reduced A-map from a system of timed processes
+  \param system : a system of timed processes
+  \param amap   : clock bound maps
+  \pre amap is empty with the same number of locations as system
+  \return true if system has computable reduced A-map and the reduced A-map has been
+  filled, false otherwise
+  \post if system has a solution, then amap has been filled with the computed reduced A-map, otherwise, amap is empty
+  */
+  bool compute_amap(tchecker::ta::system_t const & system, tchecker::amap::a_map_t & amap);
+
+  /*!
+  \brief Allocates and computes reduced A-map from a system A of timed processes
+  \param system : a system of timed processes
+  \return reduced A-map for system, nullptr if the fixpoint computation failed
+  */
+  tchecker::amap::a_map_t * compute_amap(tchecker::ta::system_t const & system);
+
+} // end of namespace amap
+
 } // end of namespace tchecker
 
 #endif // TCHECKER_CLOCKBOUNDS_SOLVER_HH
