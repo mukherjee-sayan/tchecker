@@ -773,7 +773,7 @@ namespace amap {
 
       /*!
       \brief Visitor
-      \post expr is added to Gdf, (TODO) if not present already
+      \post expr is added to Gdf, if not present already
       */
       virtual void visit(tchecker::typed_simple_clkconstr_expression_t const & expr)
       {
@@ -798,27 +798,37 @@ namespace amap {
         expr_x = tchecker::extract_lvalue_variable_ids(expr.clock()).begin();
         tchecker::binary_operator_t expr_op = expr.binary_operator();
 
-        // if _G contains expr' with expr' >= expr, do not add (TODO)
+        // do not add expr to _G if _G already contains expr'
+        // where, expr' >= expr
         for (tchecker::typed_simple_clkconstr_expression_t const * nondiag : _Gdf)
         {
-          if (tchecker::extract_lvalue_variable_ids(nondiag->clock()).begin() == expr_x &&
-             ( (tchecker::const_evaluate(nondiag->bound()) > expr_bound) ||
-               ( (tchecker::const_evaluate(nondiag->bound()) == expr_bound) &&
-                  (nondiag->binary_operator() == expr_op ||
-                  (nondiag->binary_operator() == EXPR_OP_LT && expr_op == EXPR_OP_LE))
-               ) 
-             ) 
-            )
-            return;
+          // first, we check if nondiag and expr contains the same clock
+          if (tchecker::extract_lvalue_variable_ids(nondiag->clock()).begin() == expr_x)
+          {
+            // if the binary operator present in nondiag and expr
+            // are of the same type, we want to compare the bounds
+            if (((nondiag->binary_operator() == EXPR_OP_GE || 
+                  nondiag->binary_operator() == EXPR_OP_GT) &&
+                 (expr_op == EXPR_OP_GE || expr_op == EXPR_OP_GT)) ||
+                ((nondiag->binary_operator() == EXPR_OP_LE || 
+                  nondiag->binary_operator() == EXPR_OP_LT) &&
+                 (expr_op == EXPR_OP_LE || expr_op == EXPR_OP_LT))
+               )
+              {
+                // if the bound in nondiag is >= the bound in expr
+                // we do not need to add expr to _Gdf
+                if (tchecker::const_evaluate(nondiag->bound()) >= expr_bound)
+                  return;
+              }
+          }
         }
 
-        // std::cout << "adding " << expr << std::endl;
         _Gdf.push_back(&expr);
       }
 
       /*!
       \brief Visitor
-      \post expr is added to G, (TODO) if not present already
+      \post expr is added to G, if not present already
       */
       virtual void visit(tchecker::typed_diagonal_clkconstr_expression_t const & expr)
       {
